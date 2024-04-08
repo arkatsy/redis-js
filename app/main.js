@@ -1,41 +1,60 @@
 import net from "node:net";
 import Resp from "./resp.js";
 import styleText from "./style-text.js";
+import RedisCache from "./cache.js";
+import processArgs from "./cli.js";
 
-const port = 6379;
-const host = "127.0.0.1";
+const opts = processArgs();
 
 const logger = (msg) => {
   console.log(styleText("blueBright", `[server] ${msg}`));
 };
 
+let cache;
+function initRedisCache() {
+  cache = new RedisCache({ debugCache: opts.debugCache });
+}
+
 const server = net.createServer((socket) => {
   socket.on("data", (buffer) => {
-    logger(`received: ${JSON.stringify(buffer.toString())}`);
     const parsedCmd = Resp.parse(buffer);
-    logger(`parser result: ${JSON.stringify(parsedCmd)}`);
-
     const command = Resp.read(parsedCmd);
-    logger(`reader result: ${JSON.stringify(command)}`);
 
     const [cmd, ...args] = command;
-    logger(`command: ${cmd}, args: ${JSON.stringify(args)}`);
+    logger(`command: ${cmd.toLowerCase()} \targs: ${args.join(" ")}`);
 
     switch (cmd.toLowerCase()) {
       case "echo": {
-        logger(`echoing back: ${args.join(" ")}`);
         socket.write(`+${[...args].join(" ")}\r\n`);
         break;
       }
       case "ping": {
-        logger("pinging back");
         socket.write("+PONG\r\n");
+        break;
+      }
+      case "set": {
+        const key = args[0];
+        const value = args[1];
+        cache.set(key, value);
+        socket.write("+OK\r\n");
+        break;
+      }
+      case "get": {
+        const key = args[0];
+        const value = cache.get(key);
+        if (value) {
+          socket.write(`$${value.length}\r\n${value}\r\n`);
+        } else {
+          socket.write("$-1\r\n");
+        }
         break;
       }
     }
   });
 });
 
-server.listen(port, host, () => {
-  logger(`server is running on port ${port}`);
+server.listen(opts.port, opts.host, () => {
+  logger(`server is running on port ${opts.port}`);
+  initRedisCache();
+  Resp.setDebugOpts(opts.debugParser, opts.debugReader);
 });

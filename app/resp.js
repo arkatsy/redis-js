@@ -1,8 +1,30 @@
-import { parserError, readerError } from "./resp-error.js";
+import { parserError, readerError, RESPError } from "./resp-error.js";
 import styleText from "./style-text.js";
+
+const debugOpts = {
+  parser: false,
+  reader: false,
+};
+
+function setDebugOpts(parser, reader) {
+  debugOpts.parser = parser;
+  debugOpts.reader = reader;
+}
 
 const logger = (msg, from) => {
   console.log(styleText("dim", `${from ? `[${from}] ` : ""}${msg}`));
+};
+
+const parseLogger = (msg) => {
+  if (debugOpts.parser) {
+    logger(msg, "parser");
+  }
+};
+
+const readLogger = (msg) => {
+  if (debugOpts.reader) {
+    logger(msg, "reader");
+  }
 };
 
 const CR = 13;
@@ -87,7 +109,7 @@ function parse(buffer) {
 
   while (cursor < buffer.length) {
     const byte = buffer[cursor];
-    logger(`parsing byte: ${byte}, table char: ${JSON.stringify(getChar(byte))} cursor: ${cursor}`, "parser");
+    parseLogger(`parsing byte: ${byte}, table char: ${JSON.stringify(getChar(byte))} cursor: ${cursor}`, "parser");
 
     switch (true) {
       case SYMBOLS.includes(byte): {
@@ -140,7 +162,7 @@ function parse(buffer) {
 
 function read(cmd) {
   const type = cmd.shift();
-  logger(`reading type: ${type} (${SymbolType[type]})`, "reader");
+  readLogger(`reading type: ${type} (${SymbolType[type]})`, "reader");
 
   switch (SymbolType[type]) {
     case ARRAY: {
@@ -154,7 +176,7 @@ function read(cmd) {
 
 function readArray(cmd) {
   const commandLength = cmd.shift();
-  logger(`array length: ${commandLength}`, "reader");
+  readLogger(`array length: ${commandLength}`, "reader");
   let array = [];
 
   for (let i = 0; i < commandLength; i++) {
@@ -167,17 +189,23 @@ function readArray(cmd) {
 function readBulkString(cmd) {
   const size = cmd.shift();
   const string = cmd.shift();
-  logger(`bulk string size: ${size}`, "reader");
+  readLogger(`bulk string size: ${size}`, "reader");
   if (Number(size) !== string.length) {
     throw readerError(`Expected size ${size}, got ${string.length}`);
   }
-  logger(`bulk string found: ${string}`, "reader");
+  readLogger(`bulk string found: ${string}`, "reader");
   return string;
+}
+
+
+function serialize(data) {
+  throw new RESPError("Not implemented");
 }
 
 export default {
   parse,
   read,
+  setDebugOpts,
   SymbolList: SYMBOLS,
   SymbolTable: SymbolType,
   SIMPLE_STRING,

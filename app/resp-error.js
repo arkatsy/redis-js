@@ -16,4 +16,4 @@ function readerError(msg) {
 }
 
 
-export { parserError, readerError };
+export { parserError, readerError, RESPError };
