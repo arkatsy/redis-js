@@ -1,4 +1,9 @@
-import { lexerError } from "./resp-error.js";
+import { parserError, readerError } from "./resp-error.js";
+import styleText from "./style-text.js";
+
+const logger = (msg, from) => {
+  console.log(styleText("dim", `${from ? `[${from}] ` : ""}${msg}`));
+};
 
 const CR = 13;
 const LF = 10;
@@ -50,53 +55,55 @@ const SET = "SET";
 const PUSH = "PUSH";
 
 // https://redis.io/docs/reference/protocol-spec/
+// prettier-ignore
 const SymbolType = {
-  PLUS: SIMPLE_STRING,
-  MINUS: SIMPLE_ERROR,
-  COLON: INTEGER,
-  DOLLAR: BULK_STRING,
-  ASTERISK: ARRAY,
-  UNDERSCORE: NULL,
-  HASH: BOOLEAN,
-  COMMA: DOUBLE,
-  OPEN_PAREN: BIG_NUMBER,
-  EXCLAMATION: BULK_ERROR,
-  EQUAL: VERBATIM_STRING,
-  PERCENT: MAP,
-  TILDE: SET,
-  GREATER_THAN: PUSH,
+  "+": SIMPLE_STRING,
+  "-": SIMPLE_ERROR,
+  ":": INTEGER,
+  "$": BULK_STRING,
+  "*": ARRAY,
+  "_": NULL,
+  "#": BOOLEAN,
+  ",": DOUBLE,
+  "(": BIG_NUMBER,
+  "!": BULK_ERROR,
+  "=": VERBATIM_STRING,
+  "%": MAP,
+  "~": SET,
+  ">": PUSH,
 };
 
 const isDigit = (byte) => byte >= 48 && byte <= 57;
 const isChar = (byte) => (byte >= 65 && byte <= 90) || (byte >= 97 && byte <= 122);
 const getChar = (byte) => String.fromCharCode(byte);
 
-function lex(buffer) {
+function parse(buffer) {
   if (!Buffer.isBuffer(buffer)) {
-    throw new TypeError(`Argument should be a buffer, got ${typeof buffer} `);
+    throw new TypeError(`Argument should be a buffer, got ${typeof buffer}`);
   }
 
-  const lexemes = [];
+  const cmd = [];
   let cursor = 0;
 
   while (cursor < buffer.length) {
     const byte = buffer[cursor];
+    logger(`parsing byte: ${byte}, table char: ${JSON.stringify(getChar(byte))} cursor: ${cursor}`, "parser");
 
     switch (true) {
       case SYMBOLS.includes(byte): {
-        lexemes.push(getChar(byte));
+        cmd.push(getChar(byte));
         cursor++;
         break;
       }
       case byte === CR: {
         if (buffer[cursor + 1] !== LF) {
-          throw lexerError(`Invalid CRLF sequence at position ${cursor}`);
+          throw parserError(`Invalid CRLF sequence at position ${cursor}`);
         }
         cursor += 2;
         continue;
       }
       case byte === LF: {
-        throw lexerError(`Unexpected LF at position ${cursor}. Use CRLF instead`);
+        throw parserError(`Unexpected LF at position ${cursor}. Use CRLF instead`);
       }
       default: {
         if (isDigit(byte)) {
@@ -107,7 +114,7 @@ function lex(buffer) {
             cursor++;
           }
 
-          lexemes.push(value);
+          cmd.push(value);
           continue;
         }
 
@@ -119,16 +126,72 @@ function lex(buffer) {
             cursor++;
           }
 
-          lexemes.push(value);
+          cmd.push(value);
           continue;
         }
 
-        throw lexerError(`Unexpected character ${JSON.stringify(getChar(byte))} at position ${cursor}`);
+        throw parserError(`Unexpected character ${JSON.stringify(getChar(byte))} at position ${cursor}`);
       }
     }
   }
 
-  return lexemes;
+  return cmd;
 }
 
-export { lex, SYMBOLS };
+function read(cmd) {
+  const type = cmd.shift();
+  logger(`reading type: ${type} (${SymbolType[type]})`, "reader");
+
+  switch (SymbolType[type]) {
+    case ARRAY: {
+      return readArray(cmd);
+    }
+    case BULK_STRING: {
+      return readBulkString(cmd);
+    }
+  }
+}
+
+function readArray(cmd) {
+  const commandLength = cmd.shift();
+  logger(`array length: ${commandLength}`, "reader");
+  let array = [];
+
+  for (let i = 0; i < commandLength; i++) {
+    array.push(read(cmd));
+  }
+
+  return array;
+}
+
+function readBulkString(cmd) {
+  const size = cmd.shift();
+  const string = cmd.shift();
+  logger(`bulk string size: ${size}`, "reader");
+  if (Number(size) !== string.length) {
+    throw readerError(`Expected size ${size}, got ${string.length}`);
+  }
+  logger(`bulk string found: ${string}`, "reader");
+  return string;
+}
+
+export default {
+  parse,
+  read,
+  SymbolList: SYMBOLS,
+  SymbolTable: SymbolType,
+  SIMPLE_STRING,
+  SIMPLE_ERROR,
+  INTEGER,
+  BULK_STRING,
+  ARRAY,
+  NULL,
+  BOOLEAN,
+  DOUBLE,
+  BIG_NUMBER,
+  BULK_ERROR,
+  VERBATIM_STRING,
+  MAP,
+  SET,
+  PUSH,
+};

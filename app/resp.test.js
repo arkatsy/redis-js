@@ -1,38 +1,44 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { lex, SYMBOLS } from "./resp.js";
-import { lexerError } from "./resp-error.js";
+import Resp from "./resp.js";
 
-describe("lexer", () => {
-  test("should lex integer numbers", () => {
-    assert.deepEqual(lex(Buffer.from("100")), ["100"]);
+describe("Resp parser", () => {
+  test("should parse integer numbers", () => {
+    assert.deepEqual(Resp.parse(Buffer.from("100")), ["100"]);
   });
 
-  test("should lex simple characters", () => {
-    assert.deepEqual(lex(Buffer.from("ping")), ["ping"]);
+  test("should parse simple characters", () => {
+    assert.deepEqual(Resp.parse(Buffer.from("ping")), ["ping"]);
   });
 
-  test("should lex CRLF sequences", () => {
-    assert.deepEqual(lex(Buffer.from("100\r\n")), ["100"]);
-    assert.deepEqual(lex(Buffer.from("\r\nping\r\n")), ["ping"]);
+  test("should parse CRLF sequences", () => {
+    assert.deepEqual(Resp.parse(Buffer.from("100\r\n")), ["100"]);
+    assert.deepEqual(Resp.parse(Buffer.from("\r\nping\r\n")), ["ping"]);
   });
 
   test("should throw for invalid CRLF sequences", () => {
     assert.throws(() => {
-      lex(Buffer.from("\nping\r\n"));
+      Resp.parse(Buffer.from("\nping\r\n"));
     });
   });
 
   test("should throw for unexpected LF characters", () => {
     assert.throws(() => {
-      lex(Buffer.from("ping\n"));
+      Resp.parse(Buffer.from("ping\n"));
     });
   });
 
-  test("should lex data type symbols", () => {
-    SYMBOLS.forEach((symbol) => {
+  test("should parse data type symbols", () => {
+    Resp.SymbolList.forEach((symbol) => {
       const char = String.fromCharCode(symbol);
-      assert.deepEqual(lex(Buffer.from(char)), [char]);
+      assert.deepEqual(Resp.parse(Buffer.from(char)), [char]);
     });
+  });
+});
+
+describe("Resp reader (assuming parser correctness)", () => {
+  test("should read echo command", () => {
+    const echoCmd = "*2\r\n$4\r\nECHO\r\n$3\r\nhey\r\n";
+    assert.deepEqual(Resp.read(Resp.parse(Buffer.from(echoCmd))), ["ECHO", "hey"]);
   });
 });

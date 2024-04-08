@@ -1,33 +1,19 @@
-import util from "node:util";
-
-const styleText = (style, text) => {
-  // Experimental - https://nodejs.org/docs/latest/api/util.html#utilstyletextformat-text
-  // Style string is a value defined in `util.inspect.colors`
-  if (util.styleText) {
-    return util.styleText(style, text);
-  }
-
-  return text;
-};
+import styleText from "./style-text.js";
 
 class RESPError extends Error {
   constructor(msg, from = "") {
-    let prefix = "";
-    if (from) {
-      prefix = styleText("yellow", `[${from}]: `);
-    }
-
-    super(`${prefix}${msg}`);
-    this.name = styleText("redBright", "RESPError");
+    super(styleText('red', `${from ? `[${from}]` : ""} ${msg}`));
+    this.name = ""
   }
 }
 
-function lexerError(msg) {
-  return new RESPError(msg, "LEXER");
-}
-
 function parserError(msg) {
-  return new RESPError(msg, "PARSER");
+  return new RESPError(msg, "parser");
 }
 
-export { lexerError, parserError };
+function readerError(msg) {
+  return new RESPError(msg, "reader");
+}
+
+
+export { parserError, readerError };
