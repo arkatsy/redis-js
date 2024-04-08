@@ -36,7 +36,7 @@ export default class RedisCache {
   get(key) {
     this.logger(`getting key: ${key}`);
     this.listeners.get(EVENTS.GET).forEach((listener) => listener(key));
-    return this.#cache.get(key);
+    return this.#cache.get(key) || null;
   }
 
   set(key, value) {
