@@ -5,7 +5,6 @@ import RedisCache from "./cache.js";
 import processArgs from "./cli.js";
 
 const opts = processArgs();
-
 const logger = (msg) => {
   console.log(styleText("blueBright", `[server] ${msg}`));
 };
