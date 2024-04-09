@@ -39,7 +39,6 @@ const server = net.createServer((socket) => {
           px = restCmds[1];
           logger(`set with px & time ${px}ms`);
         }
-
         cache.set(key, value, px);
         socket.write("+OK\r\n");
         break;
