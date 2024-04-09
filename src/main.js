@@ -45,6 +45,7 @@ const server = net.createServer((socket) => {
         break;
       }
       case "get": {
+        logger(`get command`);
         const key = args[0];
         const value = cache.get(key);
         logger(`get value: ${value}`);
