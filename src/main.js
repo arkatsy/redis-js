@@ -47,6 +47,7 @@ const server = net.createServer((socket) => {
       case "get": {
         const key = args[0];
         const value = cache.get(key);
+        logger(`get value: ${value}`);
         if (value) {
           socket.write(`$${value.length}\r\n${value}\r\n`);
         } else {
